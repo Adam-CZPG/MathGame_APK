@@ -4,12 +4,19 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
 
-// Komponentlarni import qilish (ulardan foydalanishda xatolik bo'lmasligi uchun)
+// Komponentlarni import qilish
 import GameHeader from '@/components/game/GameHeader';
 import MathProblem from '@/components/game/MathProblem';
 import LevelComplete from '@/components/game/LevelComplete';
 import Confetti from '@/components/game/Confetti';
 import NewBadgeModal from '@/components/game/NewBadgeModal';
+
+// --- OVOZLARNI OLDINDAN YUKLASH (Preload) ---
+const audioCache = {
+  correct: typeof Audio !== 'undefined' ? new Audio('/sounds/correct.mp3') : null,
+  wrong: typeof Audio !== 'undefined' ? new Audio('/sounds/wrong.mp3') : null,
+  victory: typeof Audio !== 'undefined' ? new Audio('/sounds/victory.mp3') : null, // Victory qo'shildi
+};
 
 const levelConfigs = {
   1: { operations: ['+'], maxNum: 10, timeLimit: 15, questions: 10 },
@@ -38,7 +45,7 @@ const gradients = [
 ];
 
 export default function Game() {
-  const { levelId } = useParams(); // URL parametrini olish uchun
+  const { levelId } = useParams();
   const level = parseInt(levelId) || 1;
   const navigate = useNavigate();
 
@@ -53,7 +60,6 @@ export default function Game() {
   const [muted, setMuted] = useState(false);
   const [answerStartTime, setAnswerStartTime] = useState(null);
 
-  // --- LOKAL MA'LUMOT TIZIMI (Server o'rniga) ---
   const [progress, setProgress] = useState({
     total_stars: 0,
     xp_points: 0,
@@ -66,6 +72,17 @@ export default function Game() {
 
   const config = levelConfigs[level] || levelConfigs[1];
   const gradient = gradients[(level - 1) % gradients.length];
+
+  // --- OVOZ CHALISH FUNKSIYASI ---
+  // Endi u 'type' qabul qiladi: correct, wrong yoki victory
+  const playSound = useCallback((type) => {
+    if (muted) return;
+    const sound = audioCache[type];
+    if (sound) {
+      sound.currentTime = 0;
+      sound.play().catch(err => console.error("Audio error:", err));
+    }
+  }, [muted]);
 
   const generateProblem = useCallback(() => {
     const operation = config.operations[Math.floor(Math.random() * config.operations.length)];
@@ -118,6 +135,10 @@ export default function Game() {
 
   const handleAnswer = async (answer) => {
     const isCorrect = answer === problem.answer;
+    
+    // To'g'ri/Xato ovozini chalish
+    playSound(isCorrect ? 'correct' : 'wrong');
+    
     const timeTaken = (Date.now() - answerStartTime) / 1000;
     
     let newStreak = isCorrect ? streak + 1 : 0;
@@ -129,13 +150,16 @@ export default function Game() {
     if (currentQuestion + 1 >= config.questions) {
       const percentage = (newScore / config.questions) * 100;
       const starsEarned = percentage >= 90 ? 3 : percentage >= 70 ? 2 : percentage >= 50 ? 1 : 0;
-      const xpEarned = newScore * 10 + starsEarned * 20;
       
-      // Lokal progressni yangilash
+      // --- VICTORY OVOZI SHU YERDA ---
+      if (newScore > 0) {
+        playSound('victory');
+      }
+
       setProgress(prev => ({
         ...prev,
         total_stars: prev.total_stars + starsEarned,
-        xp_points: prev.xp_points + xpEarned,
+        xp_points: prev.xp_points + (newScore * 10),
         total_problems_solved: prev.total_problems_solved + newScore
       }));
 
