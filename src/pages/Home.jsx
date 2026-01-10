@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Play, Trophy, Award, Sparkles } from 'lucide-react';
+import { Play, Trophy, Award, Sparkles, Lock, Globe } from 'lucide-react';
 
 // Komponentlar importi
 import GameHeader from '@/components/game/GameHeader';
@@ -11,10 +11,17 @@ import LevelCard from '@/components/game/LevelCard';
 import BadgeDisplay from '@/components/game/BadgeDisplay';
 import ProgressStats from '@/components/game/ProgressStats';
 
+// --- DUNYOLAR KONFIGURATSIYASI ---
+const WORLDS = [
+  { id: 1, name: "Novice", subtitle: "Addition & Subtraction", range: [1, 20], color: "from-green-400 to-emerald-500", icon: "🌱" },
+  { id: 2, name: "Apprentice", subtitle: "Multiplication", range: [21, 40], color: "from-blue-400 to-indigo-500", icon: "⚔️" },
+  { id: 3, name: "Master", subtitle: "Mixed Challenges", range: [41, 60], color: "from-orange-400 to-rose-500", icon: "👑" },
+];
+
 export default function Home() {
   const navigate = useNavigate();
+  const [activeWorld, setActiveWorld] = useState(1);
   
-  // Progress holati
   const [progress, setProgress] = useState({
     total_problems_solved: 0,
     current_level: 1,
@@ -28,27 +35,23 @@ export default function Home() {
     completed_levels: []
   });
 
-  // Ma'lumotlarni yuklash funksiyasi
   const loadProgress = () => {
     const savedProgress = localStorage.getItem('PlayerProgress');
     if (savedProgress) {
-      setProgress(JSON.parse(savedProgress));
+      const parsed = JSON.parse(savedProgress);
+      setProgress(parsed);
+      // Agar o'yinchi yuqori darajada bo'lsa, avtomatik o'sha dunyoni ochish
+      const worldOfPlayer = WORLDS.find(w => parsed.current_level >= w.range[0] && parsed.current_level <= w.range[1]);
+      if (worldOfPlayer) setActiveWorld(worldOfPlayer.id);
     }
   };
 
-  // Sahifa yuklanganda va har safar ushbu sahifaga qaytganda (focus) ma'lumotni yangilash
   useEffect(() => {
     loadProgress();
-    
-    // Foydalanuvchi o'yinni tugatib qaytsa, ma'lumotlar yangilanishi uchun window focus ni ham eshitamiz
     window.addEventListener('focus', loadProgress);
     return () => window.removeEventListener('focus', loadProgress);
   }, []);
 
-  // Dinamik darajalar hisobi
-  const currentMaxLevel = Math.max(15, (progress?.current_level || 1) + 4);
-  const levels = Array.from({ length: currentMaxLevel }, (_, i) => i + 1);
-  
   const isLevelUnlocked = (level) => {
     if (level === 1) return true;
     return (progress?.completed_levels || []).includes(level - 1) || level <= (progress?.current_level || 1);
@@ -57,11 +60,17 @@ export default function Home() {
   const isLevelCompleted = (level) => (progress?.completed_levels || []).includes(level);
   const getLevelStars = (level) => isLevelCompleted(level) ? 3 : 0;
 
+  // Hozirgi tanlangan dunyo darajalari
+  const currentWorld = WORLDS.find(w => w.id === activeWorld);
+  const levelsInWorld = Array.from(
+    { length: currentWorld.range[1] - currentWorld.range[0] + 1 },
+    (_, i) => currentWorld.range[0] + i
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4 md:p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
         
-        {/* Statlar Paneli (Header) */}
         <div className="mt-10 mb-4"> 
           <GameHeader 
             stars={progress?.total_stars || 0}
@@ -71,94 +80,116 @@ export default function Home() {
           />
         </div>
 
-        {/* Markaziy Hero Qismi */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-4 text-center"
+          className="mt-4 text-center mb-8"
         >
-          <motion.div
-            animate={{ y: [0, -10, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="text-6xl mb-4"
-          >
-            🧮
-          </motion.div>
           <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-lg mb-2">
             Math Champions
           </h1>
-          <p className="text-white/80 text-lg max-w-md mx-auto">
-            Master math through fun challenges! Earn stars, unlock badges, and become a Math Master!
-          </p>
+          <p className="text-white/60 text-lg">Choose your challenge and dominate!</p>
         </motion.div>
 
-        {/* Bo'limlar (Tabs) */}
         <Tabs defaultValue="levels" className="mt-8">
-          <TabsList className="grid w-full max-w-md mx-auto grid-cols-3 bg-white/20 backdrop-blur-sm rounded-2xl p-1">
-            <TabsTrigger value="levels" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-800 text-white font-bold">
+          <TabsList className="grid w-full max-w-md mx-auto grid-cols-3 bg-white/10 backdrop-blur-md rounded-2xl p-1 border border-white/10">
+            <TabsTrigger value="levels" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-900 text-white transition-all font-bold">
               <Play className="w-4 h-4 mr-2" /> Play
             </TabsTrigger>
-            <TabsTrigger value="progress" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-800 text-white font-bold">
+            <TabsTrigger value="progress" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-900 text-white transition-all font-bold">
               <Trophy className="w-4 h-4 mr-2" /> Stats
             </TabsTrigger>
-            <TabsTrigger value="badges" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-800 text-white font-bold">
+            <TabsTrigger value="badges" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-900 text-white transition-all font-bold">
               <Award className="w-4 h-4 mr-2" /> Badges
             </TabsTrigger>
           </TabsList>
 
-          {/* Darajalar ro'yxati */}
-          <TabsContent value="levels" className="mt-6">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-              {levels.map((level, index) => (
-                <div
-                  key={level}
-                  onClick={() => isLevelUnlocked(level) && navigate(`/game/${level}`)}
-                  className={isLevelUnlocked(level) ? "cursor-pointer" : "cursor-not-allowed"}
-                >
+          <TabsContent value="levels" className="mt-6 outline-none">
+            {/* --- DUNYOLARNI TANLASH NAVIGATSIYASI --- */}
+            <div className="flex flex-wrap justify-center gap-3 mb-8">
+              {WORLDS.map((world) => {
+                const isLocked = progress.current_level < world.range[0];
+                return (
+                  <button
+                    key={world.id}
+                    disabled={isLocked}
+                    onClick={() => setActiveWorld(world.id)}
+                    className={`relative overflow-hidden group px-6 py-4 rounded-2xl transition-all duration-300 border-2 ${
+                      activeWorld === world.id 
+                        ? `bg-gradient-to-r ${world.color} border-white shadow-xl scale-105` 
+                        : isLocked ? 'bg-slate-800/50 border-transparent opacity-50' : 'bg-slate-800 border-white/10 hover:border-white/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{world.icon}</span>
+                      <div className="text-left">
+                        <p className={`text-xs font-bold uppercase tracking-wider ${activeWorld === world.id ? 'text-white/80' : 'text-slate-500'}`}>World {world.id}</p>
+                        <p className={`font-black ${activeWorld === world.id ? 'text-white' : 'text-slate-300'}`}>{world.name}</p>
+                      </div>
+                      {isLocked && <Lock className="w-4 h-4 text-slate-500 ml-2" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* --- DARAJA KARTALARI --- */}
+            <AnimatePresence mode="wait">
+              <motion.div 
+                key={activeWorld}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4"
+              >
+                {levelsInWorld.map((level) => (
+                  <div
+                    key={level}
+                    onClick={() => isLevelUnlocked(level) && navigate(`/game/${level}`)}
+                    className={isLevelUnlocked(level) ? "cursor-pointer transform hover:scale-105 transition-transform" : "cursor-not-allowed opacity-75"}
+                  >
                     <LevelCard
                       level={level}
                       isUnlocked={isLevelUnlocked(level)}
                       isCompleted={isLevelCompleted(level)}
                       starsEarned={getLevelStars(level)}
                     />
-                </div>
-              ))}
-            </div>
+                  </div>
+                ))}
+              </motion.div>
+            </AnimatePresence>
 
-            <div className="mt-8 flex justify-center">
+            <div className="mt-12 flex flex-col items-center gap-4">
               <Button 
                 onClick={() => navigate(`/game/${progress?.current_level || 1}`)}
-                className="h-16 px-12 text-xl font-bold bg-gradient-to-r from-green-400 to-emerald-500 hover:from-green-500 hover:to-emerald-600 rounded-2xl shadow-xl shadow-green-500/30"
+                className="h-16 px-12 text-xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 rounded-2xl shadow-2xl shadow-emerald-500/20"
               >
                 <Sparkles className="w-6 h-6 mr-3" />
-                Continue Level {progress?.current_level || 1}
+                Quick Play: Level {progress?.current_level || 1}
               </Button>
+              <p className="text-slate-500 text-sm font-medium">Continue your journey where you left off</p>
             </div>
           </TabsContent>
 
-          {/* Statistika */}
           <TabsContent value="progress" className="mt-6">
             <ProgressStats progress={progress} />
           </TabsContent>
 
-          {/* Nishonlar Bo'limi - SHU YERDA BadgeDisplay CHAQIRILADI */}
-          <TabsContent value="badges" className="mt-6">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="bg-white/90 backdrop-blur-sm rounded-3xl p-6 shadow-2xl"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold text-gray-800">Your Achievements</h3>
-                <span className="bg-indigo-100 text-indigo-600 px-4 py-1 rounded-full text-sm font-bold">
-                  {(progress?.badges || []).length} / 10 Unlocked
-                </span>
+          <TabsContent value="badges" className="mt-6 text-center">
+            <div className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-3xl p-8">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+                <div className="text-left">
+                  <h3 className="text-2xl font-black text-white">Your Achievements</h3>
+                  <p className="text-slate-400">Keep solving to collect them all!</p>
+                </div>
+                <div className="bg-white/10 px-6 py-2 rounded-2xl border border-white/10">
+                   <span className="text-emerald-400 font-black text-xl">{(progress?.badges || []).length}</span>
+                   <span className="text-slate-400 font-bold ml-2">/ 10 Badges</span>
+                </div>
               </div>
-              
               <BadgeDisplay earnedBadges={progress?.badges || []} />
-            </motion.div>
+            </div>
           </TabsContent>
-
         </Tabs>
       </div>
     </div>
