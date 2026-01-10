@@ -18,7 +18,6 @@ const audioCache = {
   victory: typeof Audio !== 'undefined' ? new Audio('/sounds/victory.mp3') : null,
 };
 
-// --- DARAJALARNI DINAMIK HISOBLASH ---
 const getLevelConfig = (level) => {
   let operations = ['+'];
   if (level > 3) operations.push('-');
@@ -33,12 +32,7 @@ const getLevelConfig = (level) => {
 
   const timeLimit = Math.max(5, 15 - Math.floor(level / 5));
 
-  return {
-    operations,
-    maxNum,
-    timeLimit,
-    questions: 10 
-  };
+  return { operations, maxNum, timeLimit, questions: 10 };
 };
 
 const gradients = [
@@ -58,6 +52,7 @@ export default function Game() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
+  const [sessionBestStreak, setSessionBestStreak] = useState(0);
   const [problem, setProblem] = useState(null);
   const [options, setOptions] = useState([]);
   const [gameComplete, setGameComplete] = useState(false);
@@ -65,7 +60,6 @@ export default function Game() {
   const [newBadge, setNewBadge] = useState(null);
   const [muted, setMuted] = useState(false);
 
-  // Progressni localStorage'dan yuklash
   const [progress, setProgress] = useState(() => {
     const saved = localStorage.getItem('PlayerProgress');
     return saved ? JSON.parse(saved) : {
@@ -73,7 +67,10 @@ export default function Game() {
       xp_points: 0,
       badges: [],
       total_problems_solved: 0,
+      total_attempts: 0,
+      accuracy_percentage: 0,
       current_level: 1,
+      best_streak: 0,
       completed_levels: []
     };
   });
@@ -94,7 +91,6 @@ export default function Game() {
     const currentConfig = getLevelConfig(level);
     const operation = currentConfig.operations[Math.floor(Math.random() * currentConfig.operations.length)];
     let num1, num2, answer;
-
     const minNum = level > 10 ? Math.floor(currentConfig.maxNum / 5) : 1;
 
     switch (operation) {
@@ -139,6 +135,27 @@ export default function Game() {
     generateProblem();
   }, [generateProblem]);
 
+  const checkForNewBadges = (updatedProgress, currentScore, currentStreak) => {
+    const earned = [...(updatedProgress.badges || [])];
+    let justWon = null;
+
+    const addBadge = (id) => {
+      if (!earned.includes(id)) {
+        earned.push(id);
+        justWon = id;
+      }
+    };
+
+    if (level === 1 && currentScore >= 5) addBadge('first_step');
+    if (currentStreak >= 5) addBadge('on_fire');
+    if (updatedProgress.current_level >= 10) addBadge('level_up');
+    if (updatedProgress.total_problems_solved >= 100) addBadge('math_master');
+    if (currentScore === 10) addBadge('perfecto');
+    if (updatedProgress.total_stars >= 500) addBadge('champion');
+
+    return { newBadgesList: earned, newlyUnlocked: justWon };
+  };
+
   const handleAnswer = async (answer) => {
     const isCorrect = answer === problem.answer;
     playSound(isCorrect ? 'correct' : 'wrong');
@@ -147,30 +164,46 @@ export default function Game() {
     let newScore = isCorrect ? score + 1 : score;
     
     setStreak(newStreak);
+    if (newStreak > sessionBestStreak) setSessionBestStreak(newStreak);
     setScore(newScore);
 
     if (currentQuestion + 1 >= config.questions) {
-      const percentage = (newScore / config.questions) * 100;
-      const starsEarned = percentage >= 90 ? 3 : percentage >= 70 ? 2 : percentage >= 50 ? 1 : 0;
-      
+      const starsEarned = newScore >= 9 ? 3 : newScore >= 7 ? 2 : newScore >= 5 ? 1 : 0;
       if (newScore > 0) playSound('victory');
 
-      // --- SAQLASH MANTIQI ---
       const currentSaved = JSON.parse(localStorage.getItem('PlayerProgress')) || progress;
-      const updatedProgress = {
+      
+      const totalSolved = (Number(currentSaved.total_problems_solved) || 0) + newScore;
+      const totalAttempts = (Number(currentSaved.total_attempts) || 0) + config.questions;
+      
+      // Accuracy 100% dan oshib ketishini oldini olish
+      const accuracy = totalAttempts > 0 
+        ? Math.min(100, Math.round((totalSolved / totalAttempts) * 100)) 
+        : 0;
+
+      const overallBestStreak = Math.max(Number(currentSaved.best_streak) || 0, sessionBestStreak, newStreak);
+
+      let updatedProgress = {
         ...currentSaved,
-        total_stars: (currentSaved.total_stars || 0) + starsEarned,
-        xp_points: (currentSaved.xp_points || 0) + (newScore * 10),
-        total_problems_solved: (currentSaved.total_problems_solved || 0) + newScore,
-        current_level: starsEarned >= 1 ? Math.max(currentSaved.current_level || 1, level + 1) : (currentSaved.current_level || 1),
+        total_stars: (Number(currentSaved.total_stars) || 0) + starsEarned,
+        xp_points: (Number(currentSaved.xp_points) || 0) + (newScore * 10),
+        total_problems_solved: totalSolved,
+        total_attempts: totalAttempts,
+        accuracy_percentage: accuracy,
+        best_streak: overallBestStreak,
+        current_level: starsEarned >= 1 ? Math.max(Number(currentSaved.current_level) || 1, level + 1) : (Number(currentSaved.current_level) || 1),
         completed_levels: starsEarned >= 1 
           ? [...new Set([...(currentSaved.completed_levels || []), level])]
           : (currentSaved.completed_levels || [])
       };
 
+      const { newBadgesList, newlyUnlocked } = checkForNewBadges(updatedProgress, newScore, overallBestStreak);
+      updatedProgress.badges = newBadgesList;
+
       localStorage.setItem('PlayerProgress', JSON.stringify(updatedProgress));
       setProgress(updatedProgress);
 
+      if (newlyUnlocked) setNewBadge(newlyUnlocked);
       if (starsEarned >= 2) setShowConfetti(true);
       setGameComplete(true);
     } else {
@@ -181,29 +214,36 @@ export default function Game() {
 
   const handleNextLevel = () => {
     navigate(`/game/${level + 1}`);
-    setCurrentQuestion(0);
-    setScore(0);
-    setStreak(0);
-    setGameComplete(false);
-    setShowConfetti(false);
+    resetGameState();
   };
 
   const handleRetry = () => {
+    resetGameState();
+    generateProblem();
+  };
+
+  const resetGameState = () => {
     setCurrentQuestion(0);
     setScore(0);
     setStreak(0);
+    setSessionBestStreak(0);
     setGameComplete(false);
     setShowConfetti(false);
-    generateProblem();
+    setNewBadge(null);
   };
 
   return (
     <div className={`min-h-screen bg-gradient-to-br ${gradient} p-4 md:p-6`}>
       <Confetti trigger={showConfetti} />
       
-      {newBadge && (
-        <NewBadgeModal badgeId={newBadge} onClose={() => setNewBadge(null)} />
-      )}
+      <AnimatePresence>
+        {newBadge && (
+          <NewBadgeModal 
+            badgeId={newBadge} 
+            onClose={() => setNewBadge(null)} 
+          />
+        )}
+      </AnimatePresence>
 
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
@@ -221,7 +261,12 @@ export default function Game() {
           </div>
         </div>
 
-        <GameHeader stars={progress.total_stars} xp={progress.xp_points} streak={streak} level={level} />
+        <GameHeader 
+          stars={progress.total_stars} 
+          xp={progress.xp_points} 
+          streak={streak} 
+          level={level} 
+        />
 
         <div className="mt-8">
           <AnimatePresence mode="wait">

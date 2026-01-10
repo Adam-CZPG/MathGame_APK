@@ -1,67 +1,60 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Star, Zap, Trophy, Target, Flame, Crown, 
-  Rocket, Medal, Award, Sparkles 
+  Star, Flame, Zap, Trophy, Brain, 
+  Target, Rocket, ShieldCheck, Medal, Award 
 } from 'lucide-react';
 
-const badges = {
-  first_problem: { icon: Star, name: 'First Steps', description: 'Solved your first problem!', color: 'from-yellow-400 to-orange-500' },
-  streak_5: { icon: Flame, name: 'On Fire', description: '5 correct answers in a row!', color: 'from-orange-500 to-red-500' },
-  streak_10: { icon: Zap, name: 'Unstoppable', description: '10 correct answers in a row!', color: 'from-purple-500 to-indigo-600' },
-  level_5: { icon: Medal, name: 'Halfway There', description: 'Reached level 5!', color: 'from-blue-400 to-cyan-500' },
-  level_10: { icon: Crown, name: 'Math Master', description: 'Completed all levels!', color: 'from-amber-400 to-yellow-500' },
-  accuracy_90: { icon: Target, name: 'Sharpshooter', description: '90% accuracy achieved!', color: 'from-green-400 to-emerald-500' },
-  problems_50: { icon: Rocket, name: 'Problem Solver', description: 'Solved 50 problems!', color: 'from-pink-400 to-rose-500' },
-  problems_100: { icon: Trophy, name: 'Century', description: 'Solved 100 problems!', color: 'from-indigo-400 to-purple-500' },
-  speed_demon: { icon: Sparkles, name: 'Speed Demon', description: 'Answered in under 3 seconds!', color: 'from-teal-400 to-cyan-500' },
-  perfect_level: { icon: Award, name: 'Perfect Score', description: 'Completed a level with 100%!', color: 'from-fuchsia-400 to-pink-500' },
-};
+// Full list of 10 badges with English descriptions
+const ALL_BADGES = [
+  { id: 'first_step', name: 'First Step', desc: 'Completed level 1', icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-100' },
+  { id: 'on_fire', name: 'On Fire', desc: '5 correct answers in a row', icon: Flame, color: 'text-orange-500', bg: 'bg-orange-100' },
+  { id: 'quick_thinker', name: 'Quick Thinker', desc: 'Answered very quickly', icon: Zap, color: 'text-cyan-500', bg: 'bg-cyan-100' },
+  { id: 'level_up', name: 'Level Up', desc: 'Reached level 10', icon: Rocket, color: 'text-blue-500', bg: 'bg-blue-100' },
+  { id: 'math_master', name: 'Math Master', desc: 'Solved 100 problems', icon: Brain, color: 'text-purple-500', bg: 'bg-purple-100' },
+  { id: 'perfecto', name: 'Perfecto', desc: '100% score achieved', icon: ShieldCheck, color: 'text-emerald-500', bg: 'bg-emerald-100' },
+  { id: 'steady', name: 'Steady', desc: 'Played 5 days in a row', icon: Target, color: 'text-rose-500', bg: 'bg-rose-100' },
+  { id: 'champion', name: 'Champion', desc: 'Collected 500 stars', icon: Medal, color: 'text-indigo-500', bg: 'bg-indigo-100' },
+  { id: 'conqueror', name: 'Conqueror', desc: 'Completed level 50', icon: Trophy, color: 'text-amber-600', bg: 'bg-amber-100' },
+  { id: 'legend', name: 'Legend', desc: 'All badges collected', icon: Award, color: 'text-red-500', bg: 'bg-red-100' },
+];
 
-export default function BadgeDisplay({ earnedBadges, showAll = false }) {
-  const displayBadges = showAll 
-    ? Object.keys(badges) 
-    : earnedBadges;
+export default function BadgeDisplay({ earnedBadges = [] }) {
+  // Ensure earnedBadges is always an array
+  const badgesArray = Array.isArray(earnedBadges) ? earnedBadges : [];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-      {displayBadges.map((badgeId, index) => {
-        const badge = badges[badgeId];
-        if (!badge) return null;
-        
-        const isEarned = earnedBadges.includes(badgeId);
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 p-2">
+      {ALL_BADGES.map((badge, index) => {
+        const isUnlocked = badgesArray.includes(badge.id);
         const Icon = badge.icon;
-        
+
         return (
           <motion.div
-            key={badgeId}
-            initial={{ opacity: 0, scale: 0.8 }}
+            key={badge.id}
+            initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.1 }}
-            className={`relative flex flex-col items-center p-4 rounded-2xl ${
-              isEarned 
-                ? `bg-gradient-to-br ${badge.color} shadow-lg` 
-                : 'bg-gray-200'
+            transition={{ delay: index * 0.05 }}
+            className={`relative p-4 rounded-3xl border-2 flex flex-col items-center text-center transition-all duration-500 ${
+              isUnlocked 
+                ? 'bg-white border-white shadow-lg shadow-indigo-100' 
+                : 'bg-gray-200/40 border-transparent opacity-40 grayscale'
             }`}
           >
-            {!isEarned && (
-              <div className="absolute inset-0 bg-gray-400/60 rounded-2xl backdrop-blur-sm" />
-            )}
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 ${
-              isEarned ? 'bg-white/30' : 'bg-gray-300'
-            }`}>
-              <Icon className={`w-6 h-6 ${isEarned ? 'text-white' : 'text-gray-400'}`} />
+            {/* Icon Container */}
+            <div className={`p-3 rounded-2xl mb-3 ${isUnlocked ? badge.bg : 'bg-gray-300'}`}>
+              <Icon className={`w-8 h-8 ${isUnlocked ? badge.color : 'text-gray-500'}`} />
             </div>
-            <span className={`text-xs font-bold text-center ${
-              isEarned ? 'text-white' : 'text-gray-400'
-            }`}>
+
+            {/* Badge Name */}
+            <h3 className={`font-bold text-[11px] uppercase tracking-tight ${isUnlocked ? 'text-gray-800' : 'text-gray-500'}`}>
               {badge.name}
-            </span>
-            <span className={`text-[10px] text-center mt-1 ${
-              isEarned ? 'text-white/80' : 'text-gray-400'
-            }`}>
-              {badge.description}
-            </span>
+            </h3>
+
+            {/* Badge Description */}
+            <p className="text-[9px] text-gray-400 leading-tight mt-1 font-medium">
+              {badge.desc}
+            </p>
           </motion.div>
         );
       })}
