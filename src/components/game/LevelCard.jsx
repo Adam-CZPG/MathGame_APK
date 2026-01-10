@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Star, CheckCircle2 } from 'lucide-react';
-import { cn } from '@/utils'; // Loyihangizdagi utils joylashuviga qarang
+import { cn } from '@/utils';
 
 const levelThemes = [
   { from: 'from-pink-400', to: 'to-rose-500', shadow: 'shadow-pink-200' },
@@ -16,14 +16,21 @@ const levelThemes = [
   { from: 'from-rose-400', to: 'to-red-500', shadow: 'shadow-rose-200' },
 ];
 
-const levelOperations = [
-  'Addition (+)', 'Subtraction (−)', 'Mixed +/−', 'Multiplication (×)',
-  'Division (÷)', 'Mixed ×/÷', 'All Operations', 'Challenge Mode',
-  'Speed Round', 'Master Level'
-];
+// --- DINAMIK NOMI ANIQLASH FUNKSIYASI ---
+const getOperationName = (level) => {
+  if (level <= 3) return 'Addition (+)';
+  if (level <= 8) return 'Subtraction (−)';
+  if (level <= 12) return 'Multiplication (×)';
+  if (level <= 15) return 'Division (÷)';
+  if (level <= 25) return 'Mixed Operations';
+  if (level <= 50) return 'Expert Challenge';
+  return 'Master Mode';
+};
 
 export default function LevelCard({ level, isUnlocked, isCompleted, starsEarned, onClick }) {
+  // Mavzularni aylana bo'yicha olish (11-level yana birinchi rangdan boshlanadi)
   const theme = levelThemes[(level - 1) % levelThemes.length];
+  const operationName = getOperationName(level);
   
   return (
     <motion.button
@@ -38,7 +45,6 @@ export default function LevelCard({ level, isUnlocked, isCompleted, starsEarned,
           : "bg-gray-400/30 backdrop-blur-sm cursor-not-allowed border-2 border-white/10"
       )}
     >
-      {/* Agar qulflangan bo'lsa: Qulf tepada, raqam uning ostida */}
       {!isUnlocked ? (
         <div className="flex flex-col items-center justify-center gap-2">
           <Lock className="w-8 h-8 text-white/60" />
@@ -46,7 +52,6 @@ export default function LevelCard({ level, isUnlocked, isCompleted, starsEarned,
         </div>
       ) : (
         <>
-          {/* Agar bajarilgan bo'lsa: Yashil belgi */}
           {isCompleted && (
             <motion.div 
               initial={{ scale: 0 }}
@@ -57,13 +62,13 @@ export default function LevelCard({ level, isUnlocked, isCompleted, starsEarned,
             </motion.div>
           )}
 
-          {/* Ochiq holatda: Katta raqam va matn */}
           <span className="text-4xl font-black text-white drop-shadow-lg">{level}</span>
+          
+          {/* ENDI BU MATN DINAMIK: */}
           <span className="text-[10px] font-medium text-white/90 mt-1 text-center leading-tight uppercase tracking-wider">
-            {levelOperations[level - 1]}
+            {operationName}
           </span>
           
-          {/* Yulduzchalar paneli */}
           <div className="flex gap-1 mt-3">
             {[1, 2, 3].map((star) => (
               <Star 

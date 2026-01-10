@@ -29,11 +29,16 @@ export default function Home() {
     };
   });
 
-  const levels = Array.from({ length: 10 }, (_, i) => i + 1);
+  // --- O'ZGARTIRISH SHU YERDA: Dinamik darajalar yaratish ---
+  // Foydalanuvchi yetib kelgan darajadan keyin yana 4 ta qulflangan darajani ko'rsatib turadi
+  // Kamida 10 ta darajani har doim ko'rsatadi
+  const currentMaxLevel = Math.max(15, (progress?.current_level || 1) + 4);
+  const levels = Array.from({ length: currentMaxLevel }, (_, i) => i + 1);
   
   const isLevelUnlocked = (level) => {
     if (level === 1) return true;
-    return (progress?.completed_levels || []).includes(level - 1);
+    // Daraja ochilishi uchun undan oldingisi bajarilgan bo'lishi kerak
+    return (progress?.completed_levels || []).includes(level - 1) || level <= (progress?.current_level || 1);
   };
 
   const isLevelCompleted = (level) => {
@@ -47,7 +52,7 @@ export default function Home() {
  return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
-        {/* Header - mt-10 orqali panelni pastga tushirdik */}
+        {/* Header */}
         <div className="mt-10 mb-4"> 
           <GameHeader 
             stars={progress?.total_stars || 0}
@@ -112,7 +117,7 @@ export default function Home() {
                   key={level}
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: index * 0.05 }}
+                  transition={{ delay: Math.min(index * 0.05, 1) }} // Ko'p levellarda delay juda cho'zilib ketmasligi uchun
                   onClick={() => isLevelUnlocked(level) && navigate(`/game/${level}`)}
                   className={isLevelUnlocked(level) ? "cursor-pointer" : "cursor-not-allowed"}
                 >
@@ -127,7 +132,7 @@ export default function Home() {
               ))}
             </motion.div>
 
-            {/* Quick Play Button (O'yin tugmalari o'chirildi) */}
+            {/* Quick Play Button */}
             <motion.div 
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -156,14 +161,15 @@ export default function Home() {
                 <div className="h-4 bg-gray-200 rounded-full overflow-hidden">
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${((progress?.current_level || 1) / 10) * 100}%` }}
+                    // Progressni joriy darajaga moslab dinamik foizda ko'rsatamiz
+                    animate={{ width: `${Math.min(((progress?.current_level || 1) / currentMaxLevel) * 100, 100)}%` }}
                     className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"
                   />
                 </div>
                 <div className="flex justify-between mt-2 text-sm text-gray-600">
                   <span>Level 1</span>
                   <span className="font-bold text-purple-600">Level {progress?.current_level || 1}</span>
-                  <span>Level 10</span>
+                  <span>Goal: {currentMaxLevel}</span>
                 </div>
               </div>
             </motion.div>

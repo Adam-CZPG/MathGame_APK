@@ -12,7 +12,7 @@ export default function LevelComplete({
   onNextLevel, 
   onRetry, 
   onHome,
-  isLastLevel 
+  isLastLevel // Bu endi majburiy emas, lekin xato bermasligi uchun qoldiramiz
 }) {
   const percentage = Math.round((score / totalQuestions) * 100);
 
@@ -46,7 +46,6 @@ export default function LevelComplete({
             You got {score} out of {totalQuestions} correct ({percentage}%)
           </p>
 
-          {/* Stars Display */}
           <div className="flex justify-center gap-4 mb-6">
             {[1, 2, 3].map((star, index) => (
               <motion.div
@@ -70,7 +69,6 @@ export default function LevelComplete({
             ))}
           </div>
 
-          {/* XP Earned */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -80,9 +78,10 @@ export default function LevelComplete({
             <span className="text-purple-600 font-bold">+{xpEarned} XP</span>
           </motion.div>
 
-          {/* Action Buttons */}
           <div className="flex flex-col gap-3">
-            {percentage >= 70 && !isLastLevel && (
+            {/* O'ZGARTIRISH: isLastLevel shartini olib tashladik, 
+                endi 70% dan yuqori natija bo'lsa har doim "Next Level" chiqadi */}
+            {percentage >= 70 && (
               <Button
                 onClick={onNextLevel}
                 className="w-full h-14 text-lg font-bold bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 rounded-2xl"
