@@ -1,15 +1,15 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 
 buildscript {
-    
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        // 8.9.0 ni 8.9.1 ga o'zgartiring
-        classpath 'com.android.tools.build:gradle:8.9.1'
+        classpath 'com.android.tools.build:gradle:8.8.2'
         classpath 'com.google.gms:google-services:4.4.4'
+        // Kotlin versiyasini boshqarish uchun qo'shildi
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.8.22"
     }
 }
 
@@ -19,6 +19,17 @@ allprojects {
     repositories {
         google()
         mavenCentral()
+    }
+
+    // DUPLICATE CLASS xatosini tuzatish uchun ushbu blokni qo'shing:
+    configurations.all {
+        resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+            if (details.requested.group == 'org.jetbrains.kotlin') {
+                if (details.requested.name.startsWith('kotlin-stdlib-jdk')) {
+                    details.useTarget "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
+                }
+            }
+        }
     }
 }
 

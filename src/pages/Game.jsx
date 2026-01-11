@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Volume2, VolumeX } from 'lucide-react';
@@ -8,168 +7,121 @@ import GameHeader from '@/components/game/GameHeader';
 import MathProblem from '@/components/game/MathProblem';
 import LevelComplete from '@/components/game/LevelComplete';
 import Confetti from '@/components/game/Confetti';
-import NewBadgeModal from '@/components/game/NewBadgeModal';
+import usePlayerStats from '@/components/Entities/PlayerProgress';
+
+// --- OVOZLAR ---
+import correctSfx from '/sounds/correct.mp3';
+import wrongSfx from '/sounds/wrong.mp3';
+import victorySfx from '/sounds/victory.mp3';
 
 const audioCache = {
-  correct: typeof Audio !== 'undefined' ? new Audio('/sounds/correct.mp3') : null,
-  wrong: typeof Audio !== 'undefined' ? new Audio('/sounds/wrong.mp3') : null,
-  victory: typeof Audio !== 'undefined' ? new Audio('/sounds/victory.mp3') : null,
+  correct: typeof Audio !== 'undefined' ? new Audio(correctSfx) : null,
+  wrong: typeof Audio !== 'undefined' ? new Audio(wrongSfx) : null,
+  victory: typeof Audio !== 'undefined' ? new Audio(victorySfx) : null,
 };
 
-// --- YANGILANGAN QIYINCHILIK MANTIQI ---
 const getLevelConfig = (level) => {
   let operations = ['+'];
   if (level > 5) operations.push('-');
-  if (level > 20) operations.push('×'); // World 2: Ko'paytirish
-  if (level > 40) operations.push('÷'); // World 3: Bo'lish
-
-  let maxNum = 10;
-  if (level > 10) maxNum = 50;
-  if (level > 25) maxNum = 100;
-  if (level > 45) maxNum = 500;
-
-  // Vaqt daraja oshgani sari kamayadi (min 5s)
-  const timeLimit = Math.max(5, 15 - Math.floor(level / 10));
-
-  return { operations, maxNum, timeLimit, questions: 10 };
+  if (level > 20) operations.push('×'); 
+  if (level > 40) operations.push('÷'); 
+  let maxNum = level > 25 ? 100 : level > 10 ? 50 : 10;
+  return { operations, maxNum, timeLimit: Math.max(5, 15 - Math.floor(level / 10)), questions: 10 };
 };
 
-const gradients = [
-  'from-indigo-600 to-purple-700',
-  'from-emerald-500 to-teal-700',
-  'from-orange-500 to-rose-600',
-  'from-blue-600 to-cyan-700',
-];
+const gradients = ['from-indigo-600 to-purple-700', 'from-emerald-500 to-teal-700', 'from-orange-500 to-rose-600', 'from-blue-600 to-cyan-700'];
 
 export default function Game() {
   const { levelId } = useParams();
   const level = parseInt(levelId) || 1;
   const navigate = useNavigate();
+  
+  // GLOBAL STATS HOOK
+  const { stats, updateStats } = usePlayerStats();
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [score, setScore] = useState(0);
   const [streak, setStreak] = useState(0);
-  const [sessionBestStreak, setSessionBestStreak] = useState(0);
   const [problem, setProblem] = useState(null);
   const [options, setOptions] = useState([]);
   const [gameComplete, setGameComplete] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [newBadge, setNewBadge] = useState(null);
   const [muted, setMuted] = useState(false);
 
-  const [progress, setProgress] = useState(() => {
-    const saved = localStorage.getItem('PlayerProgress');
-    return saved ? JSON.parse(saved) : {
-      total_stars: 0, xp_points: 0, badges: [], total_problems_solved: 0,
-      total_attempts: 0, accuracy_percentage: 0, current_level: 1,
-      best_streak: 0, completed_levels: []
-    };
-  });
-
-  const config = getLevelConfig(level);
+  const config = useMemo(() => getLevelConfig(level), [level]);
   const gradient = gradients[(Math.floor((level-1)/20)) % gradients.length];
 
   const playSound = useCallback((type) => {
-    if (muted) return;
-    const sound = audioCache[type];
-    if (sound) {
-      sound.currentTime = 0;
-      sound.play().catch(() => {});
-    }
+    if (muted || !audioCache[type]) return;
+    audioCache[type].currentTime = 0;
+    audioCache[type].play().catch(() => {});
   }, [muted]);
 
   const generateProblem = useCallback(() => {
-    const currentConfig = getLevelConfig(level);
-    const operation = currentConfig.operations[Math.floor(Math.random() * currentConfig.operations.length)];
-    let num1, num2, answer;
+    const operation = config.operations[Math.floor(Math.random() * config.operations.length)];
+    let n1, n2, ans;
+    if (operation === '+') { n1 = Math.floor(Math.random() * config.maxNum) + 1; n2 = Math.floor(Math.random() * config.maxNum) + 1; ans = n1 + n2; }
+    else if (operation === '-') { n1 = Math.floor(Math.random() * config.maxNum) + 10; n2 = Math.floor(Math.random() * (n1 - 1)) + 1; ans = n1 - n2; }
+    else if (operation === '×') { n1 = Math.floor(Math.random() * 10) + 2; n2 = Math.floor(Math.random() * 10) + 2; ans = n1 * n2; }
+    else { n2 = Math.floor(Math.random() * 9) + 2; ans = Math.floor(Math.random() * 9) + 2; n1 = n2 * ans; }
 
-    switch (operation) {
-      case '+':
-        num1 = Math.floor(Math.random() * currentConfig.maxNum) + 1;
-        num2 = Math.floor(Math.random() * currentConfig.maxNum) + 1;
-        answer = num1 + num2;
-        break;
-      case '-':
-        num1 = Math.floor(Math.random() * currentConfig.maxNum) + 10;
-        num2 = Math.floor(Math.random() * num1) + 1;
-        answer = num1 - num2;
-        break;
-      case '×':
-        num1 = Math.floor(Math.random() * (level > 30 ? 15 : 10)) + 2;
-        num2 = Math.floor(Math.random() * 10) + 2;
-        answer = num1 * num2;
-        break;
-      case '÷':
-        num2 = Math.floor(Math.random() * 9) + 2;
-        answer = Math.floor(Math.random() * 9) + 2;
-        num1 = num2 * answer;
-        break;
-      default:
-        num1 = 1; num2 = 1; answer = 2;
-    }
+    const opts = new Set([ans]);
+    while (opts.size < 4) { let off = Math.floor(Math.random() * 11) - 5; if (ans + off > 0) opts.add(ans + (off === 0 ? 2 : off)); }
+    setProblem({ display: `${n1} ${operation} ${n2} = ?`, answer: ans });
+    setOptions(Array.from(opts).sort(() => Math.random() - 0.5));
+  }, [config]);
 
-    const wrongOptions = new Set();
-    while (wrongOptions.size < 3) {
-      let offset = Math.floor(Math.random() * 10) - 5;
-      let wrong = answer + (offset === 0 ? 3 : offset);
-      if (wrong !== answer && wrong > 0) wrongOptions.add(wrong);
-    }
-
-    setProblem({ display: `${num1} ${operation} ${num2} = ?`, answer });
-    setOptions([answer, ...wrongOptions].sort(() => Math.random() - 0.5));
-  }, [level]);
-
-  useEffect(() => {
-    generateProblem();
-  }, [generateProblem]);
+  useEffect(() => { generateProblem(); }, [generateProblem]);
 
   const handleAnswer = (userAnswer) => {
     const isCorrect = userAnswer === problem.answer;
     playSound(isCorrect ? 'correct' : 'wrong');
     
+    updateStats(isCorrect, isCorrect ? 10 : 0, 0);
+
     const newScore = isCorrect ? score + 1 : score;
     const newStreak = isCorrect ? streak + 1 : 0;
     
     setScore(newScore);
     setStreak(newStreak);
-    if (newStreak > sessionBestStreak) setSessionBestStreak(newStreak);
 
-    if (currentQuestion + 1 >= config.questions) {
-      finishGame(newScore);
-    } else {
-      setCurrentQuestion(prev => prev + 1);
-      generateProblem();
-    }
+    setTimeout(() => {
+      if (currentQuestion + 1 >= config.questions) {
+        finishGame(newScore);
+      } else {
+        setCurrentQuestion(prev => prev + 1);
+        generateProblem();
+      }
+    }, 250);
   };
 
   const finishGame = (finalScore) => {
-    const starsEarned = finalScore >= 9 ? 3 : finalScore >= 7 ? 2 : finalScore >= 5 ? 1 : 0;
-    if (starsEarned > 0) playSound('victory');
+    // 9 ball 3 ta yulduz, 7 ball 2 ta, 5 ball 1 ta
+    const stars = finalScore >= 9 ? 3 : finalScore >= 7 ? 2 : finalScore >= 5 ? 1 : 0;
+    const isPerfect = finalScore === 10;
+    
+    // YANGI MANTIQ: Faqat 3 ta yulduz bo'lsa keyingi level ochiladi
+    const canUnlockNext = stars === 3;
 
-    const currentSaved = JSON.parse(localStorage.getItem('PlayerProgress')) || progress;
-    const totalSolved = (currentSaved.total_problems_solved || 0) + finalScore;
-    const totalAttempts = (currentSaved.total_attempts || 0) + config.questions;
-    const accuracy = Math.min(100, Math.round((totalSolved / totalAttempts) * 100));
+    if (canUnlockNext) {
+      setTimeout(() => playSound('victory'), 300);
+      // level parametrini yuboramiz - keyingi bosqich ochiladi
+      updateStats(true, 0, stars, level, isPerfect);
+      setShowConfetti(true);
+    } else {
+      // Mag'lubiyat yoki kam yulduz (1-2 ta)
+      playSound(stars > 0 ? 'victory' : 'wrong');
+      // null yuboramiz - keyingi bosqich OCHILMAYDI
+      updateStats(true, 0, stars, null, false);
+      if (stars >= 2) setShowConfetti(true);
+    }
 
-    const updatedProgress = {
-      ...currentSaved,
-      total_stars: (currentSaved.total_stars || 0) + starsEarned,
-      xp_points: (currentSaved.xp_points || 0) + (finalScore * 10),
-      total_problems_solved: totalSolved,
-      total_attempts: totalAttempts,
-      accuracy_percentage: accuracy,
-      current_level: starsEarned >= 1 ? Math.max(currentSaved.current_level, level + 1) : currentSaved.current_level,
-      completed_levels: starsEarned >= 1 ? [...new Set([...(currentSaved.completed_levels || []), level])] : currentSaved.completed_levels
-    };
-
-    localStorage.setItem('PlayerProgress', JSON.stringify(updatedProgress));
-    setProgress(updatedProgress);
-    if (starsEarned >= 2) setShowConfetti(true);
     setGameComplete(true);
   };
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${gradient} p-4 text-white`}>
+    <div className={`min-h-screen bg-gradient-to-br ${gradient} p-4 text-white select-none`} 
+          style={{ WebkitUserSelect: 'none', userSelect: 'none', touchAction: 'pan-y' }}>
       <Confetti trigger={showConfetti} />
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-6">
@@ -184,31 +136,18 @@ export default function Game() {
           </div>
         </div>
 
-        <GameHeader stars={progress.total_stars} xp={progress.xp_points} streak={streak} level={level} />
+        <GameHeader stars={stats.total_stars} xp={stats.xp_points} streak={streak} level={level} />
 
         <div className="mt-12">
           {!gameComplete && problem ? (
-            <MathProblem
-              problem={problem}
-              options={options}
-              onAnswer={handleAnswer}
-              questionNumber={currentQuestion + 1}
-              totalQuestions={config.questions}
-              timeLimit={config.timeLimit}
-            />
+            <MathProblem problem={problem} options={options} onAnswer={handleAnswer} 
+                         questionNumber={currentQuestion + 1} totalQuestions={config.questions} timeLimit={config.timeLimit} />
           ) : (
-            <LevelComplete
-              level={level}
-              score={score}
-              totalQuestions={config.questions}
-              starsEarned={Math.round((score/10)*3)}
-              onNextLevel={() => {
-                navigate(`/game/${level + 1}`);
-                window.location.reload(); // Darajani to'liq yangilash uchun
-              }}
-              onRetry={() => window.location.reload()}
-              onHome={() => navigate('/')}
-            />
+            <LevelComplete level={level} score={score} totalQuestions={config.questions} 
+                           starsEarned={score >= 9 ? 3 : score >= 7 ? 2 : score >= 5 ? 1 : 0}
+                           // TUZATISH: score 9 va undan ko'p bo'lsa (3 ta yulduz) Next Level tugmasi chiqadi
+                           onNextLevel={score >= 9 ? () => { navigate(`/game/${level + 1}`); window.location.reload(); } : null}
+                           onRetry={() => window.location.reload()} onHome={() => navigate('/')} />
           )}
         </div>
       </div>

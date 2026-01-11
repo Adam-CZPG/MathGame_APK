@@ -3,15 +3,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Play, Trophy, Award, Sparkles, Lock, Globe } from 'lucide-react';
+import { Play, Trophy, Award, Sparkles, Lock } from 'lucide-react';
 
-// Komponentlar importi
 import GameHeader from '@/components/game/GameHeader';
 import LevelCard from '@/components/game/LevelCard';
 import BadgeDisplay from '@/components/game/BadgeDisplay';
 import ProgressStats from '@/components/game/ProgressStats';
 
-// --- DUNYOLAR KONFIGURATSIYASI ---
 const WORLDS = [
   { id: 1, name: "Novice", subtitle: "Addition & Subtraction", range: [1, 20], color: "from-green-400 to-emerald-500", icon: "🌱" },
   { id: 2, name: "Apprentice", subtitle: "Multiplication", range: [21, 40], color: "from-blue-400 to-indigo-500", icon: "⚔️" },
@@ -32,7 +30,8 @@ export default function Home() {
     accuracy_percentage: 0,
     total_attempts: 0,
     xp_points: 0,
-    completed_levels: []
+    completed_levels: [],
+    level_stars: {} // Initial statega qo'shildi
   });
 
   const loadProgress = () => {
@@ -40,8 +39,7 @@ export default function Home() {
     if (savedProgress) {
       const parsed = JSON.parse(savedProgress);
       setProgress(parsed);
-      // Agar o'yinchi yuqori darajada bo'lsa, avtomatik o'sha dunyoni ochish
-      const worldOfPlayer = WORLDS.find(w => parsed.current_level >= w.range[0] && parsed.current_level <= w.range[1]);
+      const worldOfPlayer = WORLDS.find(w => (parsed.current_level || 1) >= w.range[0] && (parsed.current_level || 1) <= w.range[1]);
       if (worldOfPlayer) setActiveWorld(worldOfPlayer.id);
     }
   };
@@ -58,9 +56,10 @@ export default function Home() {
   };
 
   const isLevelCompleted = (level) => (progress?.completed_levels || []).includes(level);
-  const getLevelStars = (level) => isLevelCompleted(level) ? 3 : 0;
+  
+  // TUZATILGAN JOY: Endi yulduzlar haqiqiy natijadan olinadi
+  const getLevelStars = (level) => progress?.level_stars?.[level] || 0;
 
-  // Hozirgi tanlangan dunyo darajalari
   const currentWorld = WORLDS.find(w => w.id === activeWorld);
   const levelsInWorld = Array.from(
     { length: currentWorld.range[1] - currentWorld.range[0] + 1 },
@@ -70,7 +69,6 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-4 md:p-6">
       <div className="max-w-6xl mx-auto">
-        
         <div className="mt-10 mb-4"> 
           <GameHeader 
             stars={progress?.total_stars || 0}
@@ -80,35 +78,22 @@ export default function Home() {
           />
         </div>
 
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mt-4 text-center mb-8"
-        >
-          <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-lg mb-2">
-            Math Champions
-          </h1>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-4 text-center mb-8">
+          <h1 className="text-4xl md:text-5xl font-black text-white drop-shadow-lg mb-2">Math Champions</h1>
           <p className="text-white/60 text-lg">Choose your challenge and dominate!</p>
         </motion.div>
 
         <Tabs defaultValue="levels" className="mt-8">
           <TabsList className="grid w-full max-w-md mx-auto grid-cols-3 bg-white/10 backdrop-blur-md rounded-2xl p-1 border border-white/10">
-            <TabsTrigger value="levels" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-900 text-white transition-all font-bold">
-              <Play className="w-4 h-4 mr-2" /> Play
-            </TabsTrigger>
-            <TabsTrigger value="progress" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-900 text-white transition-all font-bold">
-              <Trophy className="w-4 h-4 mr-2" /> Stats
-            </TabsTrigger>
-            <TabsTrigger value="badges" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-900 text-white transition-all font-bold">
-              <Award className="w-4 h-4 mr-2" /> Badges
-            </TabsTrigger>
+            <TabsTrigger value="levels" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-900 text-white transition-all font-bold"><Play className="w-4 h-4 mr-2" /> Play</TabsTrigger>
+            <TabsTrigger value="progress" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-900 text-white transition-all font-bold"><Trophy className="w-4 h-4 mr-2" /> Stats</TabsTrigger>
+            <TabsTrigger value="badges" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-gray-900 text-white transition-all font-bold"><Award className="w-4 h-4 mr-2" /> Badges</TabsTrigger>
           </TabsList>
 
           <TabsContent value="levels" className="mt-6 outline-none">
-            {/* --- DUNYOLARNI TANLASH NAVIGATSIYASI --- */}
             <div className="flex flex-wrap justify-center gap-3 mb-8">
               {WORLDS.map((world) => {
-                const isLocked = progress.current_level < world.range[0];
+                const isLocked = (progress?.current_level || 1) < world.range[0];
                 return (
                   <button
                     key={world.id}
@@ -133,15 +118,8 @@ export default function Home() {
               })}
             </div>
 
-            {/* --- DARAJA KARTALARI --- */}
             <AnimatePresence mode="wait">
-              <motion.div 
-                key={activeWorld}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4"
-              >
+              <motion.div key={activeWorld} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
                 {levelsInWorld.map((level) => (
                   <div
                     key={level}
@@ -160,14 +138,9 @@ export default function Home() {
             </AnimatePresence>
 
             <div className="mt-12 flex flex-col items-center gap-4">
-              <Button 
-                onClick={() => navigate(`/game/${progress?.current_level || 1}`)}
-                className="h-16 px-12 text-xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 rounded-2xl shadow-2xl shadow-emerald-500/20"
-              >
-                <Sparkles className="w-6 h-6 mr-3" />
-                Quick Play: Level {progress?.current_level || 1}
+              <Button onClick={() => navigate(`/game/${progress?.current_level || 1}`)} className="h-16 px-12 text-xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 rounded-2xl shadow-2xl shadow-emerald-500/20">
+                <Sparkles className="w-6 h-6 mr-3" /> Quick Play: Level {progress?.current_level || 1}
               </Button>
-              <p className="text-slate-500 text-sm font-medium">Continue your journey where you left off</p>
             </div>
           </TabsContent>
 
@@ -177,16 +150,6 @@ export default function Home() {
 
           <TabsContent value="badges" className="mt-6 text-center">
             <div className="bg-slate-800/50 backdrop-blur-sm border border-white/10 rounded-3xl p-8">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
-                <div className="text-left">
-                  <h3 className="text-2xl font-black text-white">Your Achievements</h3>
-                  <p className="text-slate-400">Keep solving to collect them all!</p>
-                </div>
-                <div className="bg-white/10 px-6 py-2 rounded-2xl border border-white/10">
-                   <span className="text-emerald-400 font-black text-xl">{(progress?.badges || []).length}</span>
-                   <span className="text-slate-400 font-bold ml-2">/ 10 Badges</span>
-                </div>
-              </div>
               <BadgeDisplay earnedBadges={progress?.badges || []} />
             </div>
           </TabsContent>
